@@ -197,13 +197,6 @@ func (core *Chip8) draw() {
 				spriteBit := getBit(spriteRow, 7-j)
 				screenBit := core.gfx.getPixel(x, y)
 
-				//if spriteBit != 0 {
-				//	if screenBit == 1 {
-				//		core.v[0xF] = 1
-				//	}
-				//	core.gfx.setPixel(x, y, screenBit^spriteBit)
-				//}
-
 				if screenBit == 1 && spriteBit == 1 {
 					core.v[0xF] = 1
 				}
