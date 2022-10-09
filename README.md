@@ -14,6 +14,8 @@ $ GODEBUG=cgocheck=0 chip8go -r=<path-to-rom-file>
 Go runtime doesn't allow managed memory to be passed to C functions, since `1.16` version. `GODEBUG=cgocheck=0` is required to disable this check.
 
 # Keymap
+. | . | . | .
+--- | --- | --- | ---
 1 | 2 | 3 | 4
 Q | W | E | T
 A | S | D | F
