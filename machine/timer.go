@@ -2,6 +2,7 @@ package machine
 
 import (
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -14,10 +15,10 @@ func (core *Chip8) initTimer() {
 		prevSoundTimer := byte(0)
 
 		for {
-			if len(core.DoneChan) > 0 {
-				fmt.Println("timer loop done")
-			}
 			select {
+			case <-core.DoneChan:
+				log.Println("timer loop done")
+				return
 			case <-ticker.C:
 				if core.delayTimer > 0 {
 					core.delayTimer--

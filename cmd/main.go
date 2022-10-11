@@ -35,7 +35,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	doneChan := make(chan bool)
+	doneChan := make(chan bool, 1)
 
 	core, err := machine.NewCore(romAsm, doneChan)
 	if err != nil {
@@ -63,16 +63,20 @@ func main() {
 	scr.Init(doneChan)
 
 	scr.MainLoop()
+	log.Println("Main loop ended")
+	for i := 0; i < 3; i++ {
+		doneChan <- true
+	}
 	scr.Close()
 }
 
 func bindInput(core *machine.Chip8, keyChan chan screen.KeyEvent, doneChan chan bool) {
 	for {
-		if len(doneChan) > 0 {
-			fmt.Println("bindInput done")
-			return
-		}
+
 		select {
+		case <-doneChan:
+			log.Println("bindInput done")
+			return
 		case val := <-keyChan:
 			core.SetKey(val.KeyCode, val.Pressed)
 		}

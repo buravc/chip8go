@@ -1,7 +1,6 @@
 package screen
 
 import (
-	"fmt"
 	"log"
 	"time"
 	"unsafe"
@@ -72,20 +71,36 @@ func (s *Screen) Init(doneChan chan bool) {
 	if err != nil {
 		panic(err)
 	}
-	surface.FillRect(nil, 0)
+	err = surface.FillRect(nil, 0)
+	if err != nil {
+		panic(err)
+	}
 
 	ticker := time.NewTicker(time.Duration(usPerFrame) * time.Microsecond)
 
+	palette, err := sdl.AllocPalette(2)
+	if err != nil {
+		panic(err)
+	}
+
+	err = palette.SetColors([]sdl.Color{{A: 255}, {255, 255, 255, 255}})
+	if err != nil {
+		panic(err)
+	}
+
 	go func() {
 		for {
-			if len(s.DoneChan) > 0 {
-				fmt.Println("draw loop done")
-				return
-			}
 			select {
+			case <-s.DoneChan:
+				log.Println("draw loop done")
+				return
 			case <-ticker.C:
-
 				oneBitPPSurface, _ := sdl.CreateRGBSurfaceWithFormatFrom(unsafe.Pointer(s.VideoMem), 64, 32, 1, 8, sdl.PIXELFORMAT_INDEX1MSB)
+
+				err = oneBitPPSurface.SetPalette(palette)
+				if err != nil {
+					panic(err)
+				}
 
 				newSurf, err := sdl.CreateRGBSurfaceWithFormat(0, 64, 32, 1, sdl.PIXELFORMAT_ARGB8888)
 				if err != nil {
@@ -112,37 +127,29 @@ func (s *Screen) Init(doneChan chan bool) {
 }
 
 func (s *Screen) Close() {
-	err := s.window.Destroy()
-	if err != nil {
-		panic(err)
+	if s.window != nil {
+		err := s.window.Destroy()
+		if err != nil {
+			log.Println(err)
+		}
 	}
 	sdl.Quit()
 }
 
 func (s *Screen) MainLoop() {
-	running := true
-	for running {
+	for {
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 			switch sdlEvent := event.(type) {
 			case *sdl.QuitEvent:
-				println("Quit")
-				s.DoneChan <- true
-				running = false
-				break
+				log.Println("Quit Event received")
+				return
 			case *sdl.KeyboardEvent:
-				//fmt.Println("Received key event")
-				//fmt.Printf("%+v\n", KeyEvent{
-				//	Pressed: sdlEvent.State,
-				//	KeyCode: keyMap[sdlEvent.Keysym.Sym],
-				//})
 				if val, ok := keyMap[sdlEvent.Keysym.Sym]; ok {
 					s.KeyChan <- KeyEvent{
 						Pressed: sdlEvent.State,
 						KeyCode: val,
 					}
 				}
-
-				//fmt.Println("Sent key to the chanel")
 				break
 			}
 		}
