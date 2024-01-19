@@ -4,7 +4,7 @@ const width = 64
 const height = 32
 
 type gfx struct {
-	vram [256]byte
+	vram *[256]byte
 }
 
 func (g *gfx) clear() {

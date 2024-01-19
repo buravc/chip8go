@@ -1,8 +1,12 @@
 package machine
 
+// #include <stdlib.h>
+import "C"
+
 import (
 	"errors"
 	"fmt"
+	"time"
 	"unsafe"
 )
 
@@ -41,7 +45,9 @@ type Chip8 struct {
 	gfx       gfx
 	cycleInfo CycleInfo
 	Input
-	DoneChan chan bool
+	InputChan chan KeyEvent
+
+	doneChan chan bool
 }
 
 type Registers struct {
@@ -64,18 +70,15 @@ func (r Registers) String() string {
 	return fmt.Sprintf("{pc:%x sp:%x i:%x v[0]:%x v[1]:%x v[2]:%x v[3]:%x v[4]:%x v[5]:%x v[6]:%x v[7]:%x v[8]:%x v[9]:%x v[A]:%x v[B]:%x v[C]:%x v[D]:%x v[E]:%x v[F]:%x}", r.pc, r.sp, r.i, r.v[0], r.v[1], r.v[2], r.v[3], r.v[4], r.v[5], r.v[6], r.v[7], r.v[8], r.v[9], r.v[10], r.v[11], r.v[12], r.v[13], r.v[14], r.v[15])
 }
 
-func NewCore(program []byte, doneChan chan bool) (*Chip8, error) {
+func NewCore(program []byte) (*Chip8, error) {
 	length := len(program)
 	if length > maxProgramSize {
 		return nil, errors.New("invalid program size")
 	}
 
-	if doneChan == nil {
-		return nil, errors.New("done channel is nil")
-	}
-
 	core := &Chip8{
-		DoneChan: doneChan,
+		doneChan:  make(chan bool),
+		InputChan: make(chan KeyEvent),
 	}
 
 	core.Input = &Keypad{Array: [2]byte{}}
@@ -91,10 +94,29 @@ func NewCore(program []byte, doneChan chan bool) (*Chip8, error) {
 	core.pc = programStart
 	core.sp = stackStart
 
-	core.gfx = gfx{vram: *(*[256]byte)(unsafe.Pointer(&core.memory[gfxStart]))}
+	gfxArray := C.malloc(256)
+	core.gfx = gfx{vram: (*[256]byte)(gfxArray)}
 	core.initTimer()
 
 	return core, nil
+}
+
+func (core *Chip8) Shutdown() {
+	core.doneChan <- true
+	C.free(unsafe.Pointer(core.GetVRAM()))
+}
+
+func (core *Chip8) Run() {
+	go func() {
+		for {
+			if len(core.doneChan) > 0 {
+				fmt.Println("core cycle loop done")
+				return
+			}
+			time.Sleep(time.Millisecond * 2)
+			core.Cycle()
+		}
+	}()
 }
 
 func (core *Chip8) Cycle() {
@@ -118,66 +140,56 @@ func (core *Chip8) Cycle() {
 		switch core.cycleInfo.nnn {
 		case 0xE0:
 			core.clearDisplay()
-			break
 		case 0xEE:
 			core.subReturn()
-			break
 		default:
 			core.call()
-			break
 		}
-		break
 	case 0x1, 0xB:
 		core.jmp(opNibble)
-		break
 	case 0x2:
 		core.sub()
-		break
 	case 0x3, 0x4, 0x5, 0x9, 0xE:
 		core.skip(opNibble)
-		break
 	case 0x6, 0x7:
 		core.setXNN(opNibble)
-		break
 	case 0x8:
 		core.setXY()
-		break
 	case 0xA:
 		core.setINNN()
-		break
 	case 0xC:
 		core.rand()
-		break
 	case 0xD:
 		core.draw()
-		break
 	case 0xF:
 		switch core.cycleInfo.nn {
 		case 0x07, 0x0A:
 			core.setX()
-			break
 		case 0x15, 0x18:
 			core.setTimer()
-			break
 		case 0x1E, 0x29, 0x33:
 			core.setI()
-			break
 		case 0x55, 0x65:
 			core.reg()
-			break
 		default:
 			notImplemented()
-			break
+
 		}
-		break
 	default:
 		notImplemented()
-		break
+	}
+
+	select {
+	case val := <-core.InputChan:
+		{
+			core.SetKey(val.KeyCode, val.Pressed)
+		}
+	default:
 	}
 }
 
 func (core *Chip8) GetVRAM() *[256]byte {
-	return &core.gfx.vram
+	return core.gfx.vram
 }
 
 func (core *Chip8) ReadUint16(address uint16) uint16 {

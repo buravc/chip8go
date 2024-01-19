@@ -16,7 +16,7 @@ func (core *Chip8) initTimer() {
 
 		for {
 			select {
-			case <-core.DoneChan:
+			case <-core.doneChan:
 				log.Println("timer loop done")
 				return
 			case <-ticker.C:

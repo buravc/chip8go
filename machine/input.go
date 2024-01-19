@@ -1,5 +1,10 @@
 package machine
 
+type KeyEvent struct {
+	Pressed byte
+	KeyCode byte
+}
+
 type Input interface {
 	getAnyKey() byte
 	getKey(index byte) byte

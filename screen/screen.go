@@ -1,6 +1,7 @@
 package screen
 
 import (
+	"chip8go/machine"
 	"log"
 	"time"
 	"unsafe"
@@ -32,23 +33,15 @@ var keyMap = map[sdl.Keycode]byte{
 	sdl.K_v: 0xF,
 }
 
-type KeyEvent struct {
-	Pressed byte
-	KeyCode byte
-}
-
 type Screen struct {
 	VideoMem *[256]byte
-	KeyChan  chan KeyEvent
-	DoneChan chan bool
+	KeyChan  chan machine.KeyEvent
+
+	doneChan chan bool
 	window   *sdl.Window
 }
 
-func (s *Screen) Init(doneChan chan bool) {
-	if doneChan == nil {
-		panic("doneChan is nil")
-	}
-	s.DoneChan = doneChan
+func (s *Screen) Init() {
 
 	log.Println("Initing sdl")
 
@@ -83,15 +76,17 @@ func (s *Screen) Init(doneChan chan bool) {
 		panic(err)
 	}
 
-	err = palette.SetColors([]sdl.Color{{A: 255}, {255, 255, 255, 255}})
+	err = palette.SetColors([]sdl.Color{{A: 255}, {R: 255, G: 255, B: 255, A: 255}})
 	if err != nil {
 		panic(err)
 	}
 
+	s.doneChan = make(chan bool)
+
 	go func() {
 		for {
 			select {
-			case <-s.DoneChan:
+			case <-s.doneChan:
 				log.Println("draw loop done")
 				return
 			case <-ticker.C:
@@ -128,6 +123,7 @@ func (s *Screen) Init(doneChan chan bool) {
 
 func (s *Screen) Close() {
 	if s.window != nil {
+		s.doneChan <- true
 		err := s.window.Destroy()
 		if err != nil {
 			log.Println(err)
@@ -145,12 +141,11 @@ func (s *Screen) MainLoop() {
 				return
 			case *sdl.KeyboardEvent:
 				if val, ok := keyMap[sdlEvent.Keysym.Sym]; ok {
-					s.KeyChan <- KeyEvent{
+					s.KeyChan <- machine.KeyEvent{
 						Pressed: sdlEvent.State,
 						KeyCode: val,
 					}
 				}
-				break
 			}
 		}
 	}

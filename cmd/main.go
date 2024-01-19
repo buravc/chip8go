@@ -4,12 +4,10 @@ import (
 	"chip8go/machine"
 	"chip8go/screen"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
-	"time"
 )
 
 func main() {
@@ -35,50 +33,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	doneChan := make(chan bool, 1)
-
-	core, err := machine.NewCore(romAsm, doneChan)
+	core, err := machine.NewCore(romAsm)
 	if err != nil {
 		panic(err)
 	}
 
 	scr := screen.Screen{
 		VideoMem: core.GetVRAM(),
-		KeyChan:  make(chan screen.KeyEvent),
+		KeyChan:  core.InputChan,
 	}
 
-	go bindInput(core, scr.KeyChan, doneChan)
+	core.Run()
 
-	go func() {
-		for {
-			if len(doneChan) > 0 {
-				fmt.Println("core cycle loop done")
-				return
-			}
-			time.Sleep(time.Millisecond * 2)
-			core.Cycle()
-		}
-	}()
-
-	scr.Init(doneChan)
+	scr.Init()
 
 	scr.MainLoop()
 	log.Println("Main loop ended")
-	for i := 0; i < 3; i++ {
-		doneChan <- true
-	}
 	scr.Close()
-}
-
-func bindInput(core *machine.Chip8, keyChan chan screen.KeyEvent, doneChan chan bool) {
-	for {
-
-		select {
-		case <-doneChan:
-			log.Println("bindInput done")
-			return
-		case val := <-keyChan:
-			core.SetKey(val.KeyCode, val.Pressed)
-		}
-	}
+	core.Shutdown()
 }
