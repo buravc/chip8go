@@ -1,5 +1,8 @@
 package screen
 
+// #include <stdlib.h>
+import "C"
+
 import (
 	"chip8go/machine"
 	"log"
@@ -116,6 +119,8 @@ func (s *Screen) Init() {
 				if err != nil {
 					panic(err)
 				}
+				newSurf.Free()
+				oneBitPPSurface.Free()
 			}
 		}
 	}()
